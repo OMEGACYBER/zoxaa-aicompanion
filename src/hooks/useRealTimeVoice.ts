@@ -1,0 +1,346 @@
+import { useState, useRef, useCallback, useEffect } from 'react';
+import { useToast } from '@/hooks/use-toast';
+
+interface RealTimeVoiceHookReturn {
+  isListening: boolean;
+  isSpeaking: boolean;
+  currentTranscript: string;
+  startRealTimeListening: () => Promise<void>;
+  stopRealTimeListening: () => void;
+  speakWithEmotion: (text: string, emotion?: string) => Promise<void>;
+  stopSpeaking: () => void;
+  clearTranscript: () => void;
+  setVoiceSettings: (settings: VoiceSettings) => void;
+}
+
+interface VoiceSettings {
+  voice: 'zoxaa' | 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer';
+  speed: number;
+  pitch: number;
+  emotion: 'neutral' | 'happy' | 'sad' | 'excited' | 'calm' | 'concerned';
+}
+
+const useRealTimeVoice = (): RealTimeVoiceHookReturn => {
+  const [isListening, setIsListening] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [currentTranscript, setCurrentTranscript] = useState('');
+  const [voiceSettings, setVoiceSettingsState] = useState<VoiceSettings>({
+    voice: 'zoxaa',
+    speed: 1.0,
+    pitch: 1.0,
+    emotion: 'neutral'
+  });
+
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const currentAudioRef = useRef<HTMLAudioElement | null>(null);
+  const recognitionRef = useRef<any>(null);
+  const restartCountRef = useRef<number>(0);
+  const { toast } = useToast();
+
+  // Initialize Web Speech API for real-time transcription
+  useEffect(() => {
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      recognitionRef.current = new SpeechRecognition();
+      recognitionRef.current.continuous = true;
+      recognitionRef.current.interimResults = true;
+      recognitionRef.current.lang = 'en-US';
+      recognitionRef.current.maxAlternatives = 1; // Faster processing
+      recognitionRef.current.serviceURI = ''; // Use default service
+      
+      recognitionRef.current.onresult = (event: any) => {
+        let finalTranscript = '';
+        let interimTranscript = '';
+        
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const transcript = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            finalTranscript += transcript;
+          } else {
+            interimTranscript += transcript;
+          }
+        }
+        
+        console.log('Speech recognition result:', { finalTranscript, interimTranscript });
+        setCurrentTranscript(finalTranscript + interimTranscript);
+      };
+
+             recognitionRef.current.onerror = (event: any) => {
+         console.error('Speech recognition error:', event.error);
+         
+         // Handle specific error types
+         if (event.error === 'no-speech') {
+           console.log('No speech detected, continuing to listen...');
+           // For no-speech, immediately restart to keep listening
+           if (recognitionRef.current) {
+             try {
+               recognitionRef.current.start();
+               console.log('Restarted after no-speech error');
+             } catch (e) {
+               console.log('Failed to restart after no-speech:', e);
+               // Try again after a short delay
+               setTimeout(() => {
+                 try {
+                   recognitionRef.current.start();
+                   console.log('Second restart attempt after no-speech');
+                 } catch (e2) {
+                   console.log('Second restart attempt failed:', e2);
+                 }
+               }, 100);
+             }
+           }
+           return;
+         }
+        
+        if (event.error === 'network') {
+          toast({
+            title: "Network Error",
+            description: "Please check your internet connection",
+            variant: "destructive"
+          });
+          return;
+        }
+        
+        if (event.error === 'not-allowed') {
+          toast({
+            title: "Microphone Permission Required",
+            description: "Please allow microphone access to use voice chat",
+            variant: "destructive"
+          });
+          return;
+        }
+        
+        // For other errors, show generic message
+        toast({
+          title: "Voice Recognition Error",
+          description: "Please check your microphone permissions",
+          variant: "destructive"
+        });
+      };
+
+      recognitionRef.current.onstart = () => {
+        console.log('Speech recognition started');
+      };
+
+             recognitionRef.current.onend = () => {
+         console.log('Speech recognition ended');
+         // Always restart regardless of isListening state
+         if (recognitionRef.current) {
+           console.log('Restarting speech recognition from onend...');
+           // Immediate restart attempt
+           try {
+             recognitionRef.current.start();
+             console.log('Speech recognition restarted immediately');
+           } catch (e) {
+             console.log('Failed to restart immediately:', e);
+             // Try again after a short delay
+             setTimeout(() => {
+               try {
+                 recognitionRef.current.start();
+                 console.log('Speech recognition restarted after delay');
+               } catch (e2) {
+                 console.log('Failed to restart after delay:', e2);
+                 // Try one more time after a longer delay
+                 setTimeout(() => {
+                   try {
+                     recognitionRef.current.start();
+                     console.log('Final restart attempt successful');
+                   } catch (e3) {
+                     console.log('All restart attempts failed:', e3);
+                   }
+                 }, 2000);
+               }
+             }, 200);
+           }
+         }
+       };
+    }
+  }, [toast]);
+
+  const getOpenAIKey = () => {
+    const key = localStorage.getItem('openai_key');
+    if (!key) {
+      toast({
+        title: "OpenAI API Key Required",
+        description: "Please set your OpenAI API key in settings",
+        variant: "destructive"
+      });
+      throw new Error('OpenAI API key not found');
+    }
+    return key;
+  };
+
+  const startRealTimeListening = useCallback(async () => {
+    try {
+      if (!recognitionRef.current) {
+        throw new Error('Speech recognition not supported');
+      }
+
+      recognitionRef.current.start();
+      setIsListening(true);
+      
+             // Set up continuous monitoring to ensure speech recognition stays active
+       const monitorInterval = setInterval(() => {
+         if (recognitionRef.current) {
+           try {
+             // Check if recognition is still active
+             if (recognitionRef.current.state === 'inactive') {
+               console.log('Speech recognition became inactive, restarting...');
+               recognitionRef.current.start();
+             }
+           } catch (e) {
+             console.log('Monitor restart failed:', e);
+           }
+         } else {
+           clearInterval(monitorInterval);
+         }
+       }, 300); // Check every 0.3 seconds for even faster response
+      
+      toast({
+        title: "Voice Mode Active",
+        description: "I'm listening to you in real-time..."
+      });
+    } catch (error) {
+      toast({
+        title: "Voice Error",
+        description: "Unable to start voice recognition",
+        variant: "destructive"
+      });
+      throw error;
+    }
+  }, [toast, isListening]);
+
+  const stopRealTimeListening = useCallback(() => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+    }
+    setIsListening(false);
+    setCurrentTranscript('');
+  }, []);
+
+  const speakWithEmotion = useCallback(async (text: string, emotion?: string) => {
+    try {
+      setIsSpeaking(true);
+      
+            // Use Vercel API routes
+      const response = await fetch('/api/tts', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          text: text,
+          voice: voiceSettings.voice === 'zoxaa' ? 'alloy' : voiceSettings.voice,
+          speed: voiceSettings.speed,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`TTS API error: ${response.statusText}`);
+      }
+
+      const audioData = await response.arrayBuffer();
+      const audioBlob = new Blob([audioData], { type: 'audio/mpeg' });
+      const audioUrl = URL.createObjectURL(audioBlob);
+      
+      const audio = new Audio(audioUrl);
+      currentAudioRef.current = audio;
+      
+      // Apply audio effects based on emotion
+      if (emotion) {
+        audio.playbackRate = voiceSettings.speed;
+        // You can add more audio processing here
+      }
+      
+      audio.onended = () => {
+        setIsSpeaking(false);
+        URL.revokeObjectURL(audioUrl);
+        currentAudioRef.current = null;
+      };
+      
+      audio.onerror = () => {
+        setIsSpeaking(false);
+        URL.revokeObjectURL(audioUrl);
+        currentAudioRef.current = null;
+        toast({
+          title: "Playback Error",
+          description: "Failed to play audio response",
+          variant: "destructive"
+        });
+      };
+
+      await audio.play();
+    } catch (error) {
+      setIsSpeaking(false);
+      toast({
+        title: "Speech Error",
+        description: "Failed to generate speech. Please try again.",
+        variant: "destructive"
+      });
+      throw error;
+    }
+  }, [voiceSettings, toast]);
+
+  const stopSpeaking = useCallback(() => {
+    if (currentAudioRef.current) {
+      currentAudioRef.current.pause();
+      currentAudioRef.current.currentTime = 0;
+      currentAudioRef.current = null;
+    }
+    setIsSpeaking(false);
+  }, []);
+
+  const setVoiceSettings = useCallback((settings: VoiceSettings) => {
+    setVoiceSettingsState(settings);
+  }, []);
+
+  const clearTranscript = useCallback(() => {
+    setCurrentTranscript('');
+  }, []);
+
+  const restartSpeechRecognition = useCallback(() => {
+    console.log('restartSpeechRecognition called, recognitionRef.current:', !!recognitionRef.current);
+    if (recognitionRef.current) {
+      try {
+        console.log('Attempting to restart speech recognition...');
+        recognitionRef.current.start();
+        restartCountRef.current = 0; // Reset counter on successful restart
+        console.log('Speech recognition restart successful');
+      } catch (e) {
+        console.log('Failed to restart speech recognition:', e);
+        restartCountRef.current++;
+        
+        if (restartCountRef.current < 10) { // Increased limit for more persistence
+          console.log(`Retry attempt ${restartCountRef.current}/10 in 300ms...`);
+          setTimeout(() => {
+            restartSpeechRecognition();
+          }, 300);
+        } else {
+          console.log('Too many restart attempts, but continuing to try...');
+          // Don't stop, just wait longer before next attempt
+          setTimeout(() => {
+            restartCountRef.current = 0; // Reset counter
+            restartSpeechRecognition();
+          }, 2000);
+        }
+      }
+    } else {
+      console.log('recognitionRef.current is null, cannot restart');
+    }
+  }, []);
+
+  return {
+    isListening,
+    isSpeaking,
+    currentTranscript,
+    startRealTimeListening,
+    stopRealTimeListening,
+    speakWithEmotion,
+    stopSpeaking,
+    clearTranscript,
+    setVoiceSettings
+  };
+};
+
+export default useRealTimeVoice; 
