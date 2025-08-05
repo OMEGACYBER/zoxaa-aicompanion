@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Navigation from "@/components/layout/Navigation";
 import { Button } from "@/components/ui/button";
@@ -15,18 +15,7 @@ import {
 } from "lucide-react";
 
 const Landing = () => {
-  const [showAuthModal, setShowAuthModal] = useState(false);
   const navigate = useNavigate();
-
-  // Redirect any click on the landing page to auth
-  useEffect(() => {
-    const handleClick = () => {
-      navigate('/auth');
-    };
-
-    document.addEventListener('click', handleClick);
-    return () => document.removeEventListener('click', handleClick);
-  }, [navigate]);
 
   const handleGetStarted = () => {
     navigate('/auth');
@@ -36,32 +25,46 @@ const Landing = () => {
     navigate('/auth');
   };
 
-  const handleSelectPlan = (plan: string) => {
-    navigate('/auth');
-  };
-
   return (
-    <div className="min-h-screen bg-gradient-background cursor-pointer">
+    <div className="min-h-screen bg-gradient-background">
       <Navigation onSignIn={handleSignIn} onGetStarted={handleGetStarted} />
       
-      <div className="fixed bottom-4 right-4 z-50 bg-primary/90 text-primary-foreground px-4 py-2 rounded-full text-sm animate-pulse">
-        Click anywhere to get started
-      </div>
-      
-
+      {/* Hero Section */}
+      <section className="py-24 px-4">
+        <div className="max-w-7xl mx-auto text-center space-y-8">
+          <h1 className="text-4xl md:text-7xl font-bold">
+            Meet Your{" "}
+            <span className="bg-gradient-primary bg-clip-text text-transparent">
+              Cognitive Partner
+            </span>
+          </h1>
+          <p className="text-xl md:text-2xl text-muted-foreground max-w-3xl mx-auto">
+            ZOXAA is more than an AI assistant. It's your empathetic companion that remembers, understands, and grows with you through voice and text conversations.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Button variant="hero" size="lg" onClick={handleGetStarted} className="text-lg px-8 py-6">
+              <Brain className="w-5 h-5 mr-2" />
+              Start Your Journey
+            </Button>
+            <Button variant="outline" size="lg" className="text-lg px-8 py-6">
+              Learn More
+            </Button>
+          </div>
+        </div>
+      </section>
 
       {/* Features Section */}
       <section id="features" className="py-24 px-4">
         <div className="max-w-7xl mx-auto">
           <div className="text-center space-y-4 mb-16">
             <h2 className="text-3xl md:text-5xl font-bold">
-              Why Zoxaa is{" "}
+              Why ZOXAA is{" "}
               <span className="bg-gradient-empathy bg-clip-text text-transparent">
                 Different
               </span>
             </h2>
             <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-              Most AI assistants are tools. Zoxaa is a cognitive partner that grows with you.
+              Most AI assistants are tools. ZOXAA is a cognitive partner that grows with you.
             </p>
           </div>
 
@@ -70,19 +73,19 @@ const Landing = () => {
               {
                 icon: Brain,
                 title: "Perfect Memory",
-                description: "Zoxaa remembers every conversation, your preferences, goals, and context. No more repeating yourself.",
+                description: "ZOXAA remembers every conversation, your preferences, goals, and context. No more repeating yourself.",
                 color: "memory-glow"
               },
               {
                 icon: MessageSquare,
                 title: "Honest Feedback",
-                description: "Get real, constructive criticism. Zoxaa challenges your ideas to make them better, not just agreeable.",
+                description: "Get real, constructive criticism. ZOXAA challenges your ideas to make them better, not just agreeable.",
                 color: "accent"
               },
               {
                 icon: Target,
                 title: "Strategic Planning",
-                description: "Create detailed, actionable plans together. Zoxaa helps you think through every detail and potential obstacle.",
+                description: "Create detailed, actionable plans together. ZOXAA helps you think through every detail and potential obstacle.",
                 color: "plan-success"
               },
               {
@@ -100,7 +103,7 @@ const Landing = () => {
               {
                 icon: Heart,
                 title: "Empathetic AI",
-                description: "Zoxaa understands context and emotion. It's designed to be supportive while still being honest and helpful.",
+                description: "ZOXAA understands context and emotion. It's designed to be supportive while still being honest and helpful.",
                 color: "accent"
               }
             ].map((feature, index) => {
@@ -139,15 +142,15 @@ const Landing = () => {
           <div className="grid md:grid-cols-3 gap-6">
             {[
               {
-                quote: "Zoxaa remembers details from months ago and connects them to current conversations. It's like having a personal advisor who never forgets.",
+                quote: "ZOXAA remembers details from months ago and connects them to current conversations. It's like having a personal advisor who never forgets.",
                 author: "Priya K., Marketing Manager"
               },
               {
-                quote: "Unlike other AI, Zoxaa actually challenges my ideas and helps me think deeper. It's become essential for my strategic planning.",
+                quote: "Unlike other AI, ZOXAA actually challenges my ideas and helps me think deeper. It's become essential for my strategic planning.",
                 author: "Aarav S., Architecture Student"
               },
               {
-                quote: "The planning feature is incredible. We built my entire career transition strategy together, and Zoxaa keeps me accountable.",
+                quote: "The planning feature is incredible. We built my entire career transition strategy together, and ZOXAA keeps me accountable.",
                 author: "Sarah M., Product Designer"
               }
             ].map((testimonial, index) => (
@@ -167,8 +170,6 @@ const Landing = () => {
         </div>
       </section>
 
-
-
       {/* CTA Section */}
       <section id="about" className="py-24 px-4">
         <div className="max-w-4xl mx-auto text-center space-y-8">
@@ -183,8 +184,8 @@ const Landing = () => {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button variant="hero" size="lg" onClick={handleGetStarted} className="text-lg px-8 py-6">
-              <Brain className="w-5 h-5" />
-              Start Your Journey with Zoxaa
+              <Brain className="w-5 h-5 mr-2" />
+              Start Your Journey with ZOXAA
             </Button>
             <Button variant="outline" size="lg" className="text-lg px-8 py-6">
               Learn More
@@ -203,7 +204,7 @@ const Landing = () => {
                   <Brain className="w-5 h-5 text-primary-foreground" />
                 </div>
                 <span className="text-xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-                  Zoxaa
+                  ZOXAA
                 </span>
               </div>
               <p className="text-muted-foreground">
@@ -243,7 +244,7 @@ const Landing = () => {
           </div>
 
           <div className="mt-8 pt-8 border-t border-border text-center text-muted-foreground">
-            <p>&copy; 2025 Zoxaa. All rights reserved. Built with empathy and intelligence.</p>
+            <p>&copy; 2025 ZOXAA. All rights reserved. Built with empathy and intelligence.</p>
           </div>
         </div>
       </footer>

@@ -2,11 +2,10 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "framework": "vite",
-  "installCommand": "npm install",
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "/api/$1"
+      "destination": "/backend/$1"
     },
     {
       "source": "/(.*)",
@@ -14,8 +13,19 @@
     }
   ],
   "functions": {
-    "api/**/*.js": {
-      "runtime": "nodejs18.x"
+    "backend/chat.js": {
+      "maxDuration": 30
+    },
+    "backend/tts.js": {
+      "maxDuration": 30
+    },
+    "backend/health.js": {
+      "maxDuration": 10
     }
+  },
+  "env": {
+    "VITE_BACKEND_URL": "@vite_backend_url",
+    "VITE_SUPABASE_URL": "@vite_supabase_url",
+    "VITE_SUPABASE_ANON_KEY": "@vite_supabase_anon_key"
   }
 } 

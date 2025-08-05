@@ -123,40 +123,28 @@ const useRealTimeVoice = (): RealTimeVoiceHookReturn => {
         console.log('Speech recognition started');
       };
 
-             recognitionRef.current.onend = () => {
-         console.log('Speech recognition ended');
-         // Always restart regardless of isListening state
-         if (recognitionRef.current) {
-           console.log('Restarting speech recognition from onend...');
-           // Immediate restart attempt
-           try {
-             recognitionRef.current.start();
-             console.log('Speech recognition restarted immediately');
-           } catch (e) {
-             console.log('Failed to restart immediately:', e);
-             // Try again after a short delay
-             setTimeout(() => {
-               try {
-                 recognitionRef.current.start();
-                 console.log('Speech recognition restarted after delay');
-               } catch (e2) {
-                 console.log('Failed to restart after delay:', e2);
-                 // Try one more time after a longer delay
-                 setTimeout(() => {
-                   try {
-                     recognitionRef.current.start();
-                     console.log('Final restart attempt successful');
-                   } catch (e3) {
-                     console.log('All restart attempts failed:', e3);
-                   }
-                 }, 2000);
-               }
-             }, 200);
-           }
-         }
-       };
+      recognitionRef.current.onend = () => {
+        console.log('Speech recognition ended');
+        // Only restart if we're supposed to be listening
+        if (isListening && recognitionRef.current) {
+          console.log('Restarting speech recognition from onend...');
+          // Add a small delay to prevent rapid restarts
+          setTimeout(() => {
+            if (isListening && recognitionRef.current) {
+              try {
+                recognitionRef.current.start();
+                console.log('Speech recognition restarted from onend');
+              } catch (e) {
+                console.log('Failed to restart from onend:', e);
+                // If restart fails, stop listening
+                setIsListening(false);
+              }
+            }
+          }, 100);
+        }
+      };
     }
-  }, [toast]);
+  }, [toast, isListening]);
 
   const getOpenAIKey = () => {
     const key = localStorage.getItem('openai_key');
@@ -177,31 +165,27 @@ const useRealTimeVoice = (): RealTimeVoiceHookReturn => {
         throw new Error('Speech recognition not supported');
       }
 
+      // Check if already listening
+      if (isListening) {
+        console.log('Speech recognition already active');
+        return;
+      }
+
+      // Check if recognition is already started
+      if (recognitionRef.current.state === 'recording' || recognitionRef.current.state === 'starting') {
+        console.log('Speech recognition already started');
+        return;
+      }
+
       recognitionRef.current.start();
       setIsListening(true);
-      
-             // Set up continuous monitoring to ensure speech recognition stays active
-       const monitorInterval = setInterval(() => {
-         if (recognitionRef.current) {
-           try {
-             // Check if recognition is still active
-             if (recognitionRef.current.state === 'inactive') {
-               console.log('Speech recognition became inactive, restarting...');
-               recognitionRef.current.start();
-             }
-           } catch (e) {
-             console.log('Monitor restart failed:', e);
-           }
-         } else {
-           clearInterval(monitorInterval);
-         }
-       }, 300); // Check every 0.3 seconds for even faster response
       
       toast({
         title: "Voice Mode Active",
         description: "I'm listening to you in real-time..."
       });
     } catch (error) {
+      console.error('Failed to start speech recognition:', error);
       toast({
         title: "Voice Error",
         description: "Unable to start voice recognition",
@@ -213,7 +197,11 @@ const useRealTimeVoice = (): RealTimeVoiceHookReturn => {
 
   const stopRealTimeListening = useCallback(() => {
     if (recognitionRef.current) {
-      recognitionRef.current.stop();
+      try {
+        recognitionRef.current.stop();
+      } catch (error) {
+        console.log('Error stopping speech recognition:', error);
+      }
     }
     setIsListening(false);
     setCurrentTranscript('');
@@ -223,8 +211,10 @@ const useRealTimeVoice = (): RealTimeVoiceHookReturn => {
     try {
       setIsSpeaking(true);
       
-            // Use Vercel API routes
-      const response = await fetch('/api/tts', {
+      // Use relative URL for both local development and Vercel deployment
+      const apiUrl = '/api/tts';
+        
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

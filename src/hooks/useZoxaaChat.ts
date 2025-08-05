@@ -115,8 +115,10 @@ const useZoxaaChat = () => {
         content: m.content
       }));
 
-          // Use Vercel API routes
-    const response = await fetch('/api/chat', {
+      // Use relative URL for both local development and Vercel deployment
+      const apiUrl = '/api/chat';
+        
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -165,7 +167,7 @@ In all interactions, your ultimate purpose is to be the one indispensable partne
       
       const errorMsg: Message = {
         id: (Date.now() + 1).toString(),
-        content: "I'm sorry, I'm having trouble connecting right now. Please make sure the backend server is running and try again.",
+        content: "I'm sorry, I'm having trouble connecting right now. Please try again.",
         role: "assistant",
         timestamp: new Date()
       };
