@@ -147,3 +147,4 @@ Make sure to set these environment variables in your Vercel dashboard:
 ## License
 
 MIT License - see LICENSE file for details. 
+# Auto-trigger deployment
