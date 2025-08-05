@@ -65,32 +65,59 @@ const useRealTimeVoice = (): RealTimeVoiceHookReturn => {
         });
       }
       
-      // Add network connectivity check
-      const checkNetworkConnectivity = async () => {
-        try {
-          const response = await fetch('https://www.google.com', { 
-            method: 'HEAD',
-            mode: 'no-cors'
-          });
-          console.log('✅ Network connectivity confirmed');
-          return true;
-        } catch (error) {
-          console.log('❌ Network connectivity issue detected');
-          return false;
-        }
-      };
+             // Add network connectivity check
+       const checkNetworkConnectivity = async () => {
+         try {
+           const response = await fetch('https://www.google.com', { 
+             method: 'HEAD',
+             mode: 'no-cors'
+           });
+           console.log('✅ Network connectivity confirmed');
+           return true;
+         } catch (error) {
+           console.log('❌ Network connectivity issue detected');
+           return false;
+         }
+       };
+       
+       // Add speech recognition service check
+       const checkSpeechRecognitionService = async () => {
+         try {
+           // Try to access a speech recognition test endpoint
+           const response = await fetch('https://speech.googleapis.com/v1/speech:recognize', {
+             method: 'POST',
+             headers: { 'Content-Type': 'application/json' },
+             body: JSON.stringify({ config: { languageCode: 'en-US' } })
+           });
+           console.log('✅ Speech recognition service accessible');
+           return true;
+         } catch (error) {
+           console.log('❌ Speech recognition service not accessible:', error);
+           return false;
+         }
+       };
       
-      // Check network before initializing speech recognition
-      checkNetworkConnectivity().then(isConnected => {
-        if (!isConnected) {
-          console.log('⚠️ Network issues detected, speech recognition may fail');
-          toast({
-            title: "Network Warning",
-            description: "Speech recognition may not work due to network issues. Text input is available.",
-            variant: "default"
-          });
-        }
-      });
+             // Check network and speech services before initializing speech recognition
+       Promise.all([
+         checkNetworkConnectivity(),
+         checkSpeechRecognitionService()
+       ]).then(([networkOk, speechOk]) => {
+         if (!networkOk) {
+           console.log('⚠️ Network issues detected, speech recognition may fail');
+           toast({
+             title: "Network Warning",
+             description: "Speech recognition may not work due to network issues. Text input is available.",
+             variant: "default"
+           });
+         } else if (!speechOk) {
+           console.log('⚠️ Speech recognition service blocked, using fallback');
+           toast({
+             title: "Speech Recognition Unavailable",
+             description: "Speech services are blocked. Please use text input to chat with ZOXAA.",
+             variant: "default"
+           });
+         }
+       });
       
       recognitionRef.current.onresult = (event: any) => {
         let finalTranscript = '';

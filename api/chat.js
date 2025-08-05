@@ -49,7 +49,7 @@ export default async function handler(req, res) {
       model: 'gpt-4',
       messages: allMessages,
       temperature: 0.8,
-      max_tokens: 100,
+      max_tokens: 300, // Increased from 100 to 300 for longer responses
       presence_penalty: 0.05,
       frequency_penalty: 0.05,
     });
