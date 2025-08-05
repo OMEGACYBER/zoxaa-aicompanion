@@ -236,8 +236,16 @@ const useRealTimeVoice = (): RealTimeVoiceHookReturn => {
         throw new Error(`TTS API error: ${response.statusText}`);
       }
 
-      const audioData = await response.arrayBuffer();
-      const audioBlob = new Blob([audioData], { type: 'audio/mpeg' });
+      const result = await response.json();
+      
+      // Convert base64 to blob
+      const audioData = atob(result.audio);
+      const audioArray = new Uint8Array(audioData.length);
+      for (let i = 0; i < audioData.length; i++) {
+        audioArray[i] = audioData.charCodeAt(i);
+      }
+      
+      const audioBlob = new Blob([audioArray], { type: 'audio/mpeg' });
       const audioUrl = URL.createObjectURL(audioBlob);
       
       const audio = new Audio(audioUrl);

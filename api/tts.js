@@ -52,12 +52,14 @@ export default async function handler(req, res) {
     
     console.log('✅ TTS audio generated successfully, size:', buffer.length, 'bytes');
     
-    res.set({
-      'Content-Type': 'audio/mpeg',
-      'Content-Length': buffer.length
-    });
+    // Convert to base64 for reliable serverless function response
+    const base64Audio = buffer.toString('base64');
     
-    res.send(buffer);
+    res.json({
+      audio: base64Audio,
+      format: 'mp3',
+      size: buffer.length
+    });
   } catch (error) {
     console.error('❌ TTS API error:', error);
     
