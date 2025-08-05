@@ -216,8 +216,8 @@ const useRealTimeVoice = (): RealTimeVoiceHookReturn => {
           return;
         }
         
-        // Prevent too frequent restarts
-        if (timeSinceLastRestart < 2000) {
+        // Prevent too frequent restarts - increased to 5 seconds
+        if (timeSinceLastRestart < 5000) {
           console.log('⚠️ Restart too frequent, waiting...');
           shouldRestart = false;
         }
@@ -232,8 +232,14 @@ const useRealTimeVoice = (): RealTimeVoiceHookReturn => {
             console.log('No speech detected, attempting to restart...');
             errorMessage = "No speech detected. Please try speaking louder.";
             shouldShowToast = false;
-            shouldRestart = true;
-            restartCountRef.current++;
+            // Only restart no-speech errors occasionally, not every time
+            if (restartCountRef.current < 2) {
+              shouldRestart = true;
+              restartCountRef.current++;
+            } else {
+              console.log('Too many no-speech errors, stopping restart attempts');
+              shouldRestart = false;
+            }
             break;
           case 'network':
             errorMessage = "Network error. Please check your internet connection.";
@@ -272,7 +278,7 @@ const useRealTimeVoice = (): RealTimeVoiceHookReturn => {
         }
         
         // Handle restart logic with improved timeout
-        if (shouldRestart && isListening && !isRestartingRef.current && timeSinceLastRestart >= 2000) {
+        if (shouldRestart && isListening && !isRestartingRef.current && timeSinceLastRestart >= 5000) {
           console.log(`🔄 Attempting to restart speech recognition (attempt ${restartCountRef.current}/${maxRestartAttempts})...`);
           isRestartingRef.current = true;
           lastRestartTimeRef.current = now;
@@ -291,14 +297,14 @@ const useRealTimeVoice = (): RealTimeVoiceHookReturn => {
                       setIsListening(false);
                     }
                   }
-                }, 1000); // Increased delay for better stability
+                }, 2000); // Increased delay for better stability
               } catch (stopError) {
                 console.error('Failed to stop speech recognition for restart:', stopError);
                 setIsListening(false);
               }
             }
             isRestartingRef.current = false;
-          }, 2000); // Increased delay before restart
+          }, 3000); // Increased delay before restart
         } else if (!shouldRestart) {
           setIsListening(false);
         }
@@ -330,18 +336,24 @@ const useRealTimeVoice = (): RealTimeVoiceHookReturn => {
       recognitionRef.current.onend = () => {
         console.log('🎤 Speech recognition ended');
         if (isListening && !isRestartingRef.current) {
-          console.log('🔄 Speech recognition ended, attempting to restart...');
-          setTimeout(() => {
-            if (recognitionRef.current && isListening) {
-              try {
-                recognitionRef.current.start();
-                console.log('✅ Speech recognition restarted from onend');
-              } catch (error) {
-                console.log('Failed to restart from onend:', error);
-                setIsListening(false);
+          // Only auto-restart if we haven't had too many errors
+          if (restartCountRef.current < 3) {
+            console.log('🔄 Speech recognition ended, attempting to restart...');
+            setTimeout(() => {
+              if (recognitionRef.current && isListening) {
+                try {
+                  recognitionRef.current.start();
+                  console.log('✅ Speech recognition restarted from onend');
+                } catch (error) {
+                  console.log('Failed to restart from onend:', error);
+                  setIsListening(false);
+                }
               }
-            }
-          }, 300);
+            }, 1000); // Increased delay
+          } else {
+            console.log('Too many errors, not auto-restarting');
+            setIsListening(false);
+          }
         }
       };
       
