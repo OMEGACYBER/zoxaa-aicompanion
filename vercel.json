@@ -11,17 +11,5 @@
       "source": "/(.*)",
       "destination": "/index.html"
     }
-  ],
-  "functions": {
-    "backend/chat.js": {
-      "maxDuration": 30
-    },
-    "backend/tts.js": {
-      "maxDuration": 30
-    },
-    "backend/health.js": {
-      "maxDuration": 10
-    }
-  }
-
+  ]
 } 
