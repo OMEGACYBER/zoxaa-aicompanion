@@ -22,6 +22,6 @@
     "backend/health.js": {
       "maxDuration": 10
     }
-  },
+  }
 
 } 

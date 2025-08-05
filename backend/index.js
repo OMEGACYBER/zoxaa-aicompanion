@@ -14,15 +14,11 @@ app.use(express.json());
 const chatRouter = require('./chat');
 const ttsRouter = require('./tts');
 const healthRouter = require('./health');
-const debugRouter = require('./debug');
-const testRouter = require('./test');
 
 // API routes
 app.use('/api/chat', chatRouter);
 app.use('/api/tts', ttsRouter);
 app.use('/api/health', healthRouter);
-app.use('/api/debug', debugRouter);
-app.use('/api/test', testRouter);
 
 // Root endpoint
 app.get('/', (req, res) => {
@@ -37,9 +33,7 @@ app.get('/api', (req, res) => {
     endpoints: {
       health: '/api/health',
       chat: '/api/chat',
-      tts: '/api/tts',
-      debug: '/api/debug',
-      test: '/api/test'
+      tts: '/api/tts'
     }
   });
 });
