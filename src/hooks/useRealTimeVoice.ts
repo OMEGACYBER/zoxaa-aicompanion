@@ -52,6 +52,19 @@ const useRealTimeVoice = (): RealTimeVoiceHookReturn => {
       // Remove serviceURI to use default service and avoid network issues
       // recognitionRef.current.serviceURI = ''; // Commented out to use default
       
+      // Add better error handling for initialization
+      try {
+        // Test if speech recognition can be initialized
+        console.log('🎤 Speech recognition initialized successfully');
+      } catch (error) {
+        console.error('❌ Failed to initialize speech recognition:', error);
+        toast({
+          title: "Voice Recognition Not Supported",
+          description: "Your browser doesn't support voice recognition",
+          variant: "destructive"
+        });
+      }
+      
       recognitionRef.current.onresult = (event: any) => {
         let finalTranscript = '';
         let interimTranscript = '';
@@ -98,34 +111,48 @@ const useRealTimeVoice = (): RealTimeVoiceHookReturn => {
         
         if (event.error === 'network') {
           console.log('Speech recognition network error, attempting to restart...');
-          // Try to restart speech recognition after network error
+          // Try to restart speech recognition after network error with exponential backoff
           if (recognitionRef.current && isListening && !isRestartingRef.current) {
             isRestartingRef.current = true;
+            const retryDelay = Math.min(1000 * Math.pow(2, restartCountRef.current), 5000); // Max 5 seconds
+            
             setTimeout(() => {
               if (isListening && recognitionRef.current) {
                 try {
                   recognitionRef.current.start();
                   console.log('Restarted after network error');
+                  restartCountRef.current = 0; // Reset on success
                 } catch (e) {
                   console.log('Failed to restart after network error:', e);
-                  toast({
-                    title: "Voice Recognition Error",
-                    description: "Please refresh the page and try again",
-                    variant: "destructive"
-                  });
+                  restartCountRef.current++;
+                  
+                  if (restartCountRef.current < 5) {
+                    console.log(`Retrying network error recovery (${restartCountRef.current}/5)...`);
+                    // Don't show error toast yet, keep trying
+                  } else {
+                    console.log('Too many network errors, showing user message');
+                    toast({
+                      title: "Voice Recognition Error",
+                      description: "Please check your internet connection and refresh the page",
+                      variant: "destructive"
+                    });
+                  }
                 } finally {
                   isRestartingRef.current = false;
                 }
               } else {
                 isRestartingRef.current = false;
               }
-            }, 1000); // Longer delay for network errors
+            }, retryDelay);
           } else {
-            toast({
-              title: "Network Error",
-              description: "Please check your internet connection and try again",
-              variant: "destructive"
-            });
+            // Only show error if we're not in retry mode
+            if (restartCountRef.current === 0) {
+              toast({
+                title: "Network Error",
+                description: "Please check your internet connection and try again",
+                variant: "destructive"
+              });
+            }
           }
           return;
         }
@@ -212,6 +239,9 @@ const useRealTimeVoice = (): RealTimeVoiceHookReturn => {
 
       // Add a small delay to ensure proper initialization
       await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Reset retry counter when starting fresh
+      restartCountRef.current = 0;
       
       recognitionRef.current.start();
       setIsListening(true);
