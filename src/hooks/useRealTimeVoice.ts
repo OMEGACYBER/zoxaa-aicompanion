@@ -42,6 +42,8 @@ const useRealTimeVoice = (): RealTimeVoiceHookReturn => {
   const recognitionRef = useRef<any>(null);
   const restartCountRef = useRef<number>(0);
   const isRestartingRef = useRef<boolean>(false);
+  const maxRestartAttemptsRef = useRef<number>(5);
+  const lastRestartTimeRef = useRef<number>(0);
   const { toast } = useToast();
 
   // Enhanced device detection
@@ -190,35 +192,75 @@ const useRealTimeVoice = (): RealTimeVoiceHookReturn => {
         recognitionRef.current.maxAlternatives = 1;
       }
       
-      // Enhanced error handling
+      // Enhanced error handling with better recovery
       recognitionRef.current.onerror = (event: any) => {
         console.error('Speech recognition error:', event.error);
         
         let errorMessage = "Voice recognition error";
         let shouldShowToast = true;
+        let shouldRestart = false;
+        
+        // Check restart limits
+        const now = Date.now();
+        const timeSinceLastRestart = now - lastRestartTimeRef.current;
+        const maxRestartAttempts = maxRestartAttemptsRef.current;
+        
+        if (restartCountRef.current >= maxRestartAttempts) {
+          console.log('❌ Max restart attempts reached, stopping voice recognition');
+          toast({
+            title: "Voice Recognition Unavailable",
+            description: "Too many restart attempts. Please try again later or use text input.",
+            variant: "destructive"
+          });
+          setIsListening(false);
+          return;
+        }
+        
+        // Prevent too frequent restarts
+        if (timeSinceLastRestart < 2000) {
+          console.log('⚠️ Restart too frequent, waiting...');
+          shouldRestart = false;
+        }
         
         switch (event.error) {
           case 'not-allowed':
             errorMessage = "Microphone access denied. Please allow microphone access in your browser settings.";
             setPermissionGranted(false);
+            shouldRestart = false;
             break;
           case 'no-speech':
+            console.log('No speech detected, attempting to restart...');
             errorMessage = "No speech detected. Please try speaking louder.";
             shouldShowToast = false;
+            shouldRestart = true;
+            restartCountRef.current++;
             break;
           case 'network':
             errorMessage = "Network error. Please check your internet connection.";
+            shouldRestart = true;
+            restartCountRef.current++;
             break;
           case 'service-not-allowed':
             errorMessage = "Voice recognition service blocked. Please use text input.";
             setVoiceSupported(false);
+            shouldRestart = false;
             break;
           case 'aborted':
+            console.log('Speech recognition was interrupted, attempting to restart...');
             errorMessage = "Voice recognition was interrupted.";
             shouldShowToast = false;
+            shouldRestart = true;
+            restartCountRef.current++;
+            break;
+          case 'audio-capture':
+            errorMessage = "No microphone found. Please connect a microphone and try again.";
+            shouldRestart = true;
+            restartCountRef.current++;
             break;
           default:
             errorMessage = `Voice recognition error: ${event.error}`;
+            shouldRestart = true;
+            restartCountRef.current++;
         }
         
         if (shouldShowToast) {
@@ -229,7 +271,37 @@ const useRealTimeVoice = (): RealTimeVoiceHookReturn => {
           });
         }
         
-        setIsListening(false);
+        // Handle restart logic with improved timeout
+        if (shouldRestart && isListening && !isRestartingRef.current && timeSinceLastRestart >= 2000) {
+          console.log(`🔄 Attempting to restart speech recognition (attempt ${restartCountRef.current}/${maxRestartAttempts})...`);
+          isRestartingRef.current = true;
+          lastRestartTimeRef.current = now;
+          
+          setTimeout(() => {
+            if (recognitionRef.current && isListening) {
+              try {
+                recognitionRef.current.stop();
+                setTimeout(() => {
+                  if (recognitionRef.current && isListening) {
+                    try {
+                      recognitionRef.current.start();
+                      console.log('✅ Speech recognition restarted successfully');
+                    } catch (restartError) {
+                      console.error('Failed to restart speech recognition:', restartError);
+                      setIsListening(false);
+                    }
+                  }
+                }, 1000); // Increased delay for better stability
+              } catch (stopError) {
+                console.error('Failed to stop speech recognition for restart:', stopError);
+                setIsListening(false);
+              }
+            }
+            isRestartingRef.current = false;
+          }, 2000); // Increased delay before restart
+        } else if (!shouldRestart) {
+          setIsListening(false);
+        }
       };
       
       recognitionRef.current.onresult = (event: any) => {
@@ -252,17 +324,21 @@ const useRealTimeVoice = (): RealTimeVoiceHookReturn => {
       recognitionRef.current.onstart = () => {
         console.log('🎤 Speech recognition started');
         setIsListening(true);
+        isRestartingRef.current = false;
       };
       
       recognitionRef.current.onend = () => {
         console.log('🎤 Speech recognition ended');
         if (isListening && !isRestartingRef.current) {
+          console.log('🔄 Speech recognition ended, attempting to restart...');
           setTimeout(() => {
             if (recognitionRef.current && isListening) {
               try {
                 recognitionRef.current.start();
+                console.log('✅ Speech recognition restarted from onend');
               } catch (error) {
                 console.log('Failed to restart from onend:', error);
+                setIsListening(false);
               }
             }
           }, 300);
@@ -312,6 +388,8 @@ const useRealTimeVoice = (): RealTimeVoiceHookReturn => {
       
       // Reset retry counter when starting fresh
       restartCountRef.current = 0;
+      lastRestartTimeRef.current = 0;
+      isRestartingRef.current = false;
       
       recognitionRef.current?.start();
       setIsListening(true);
@@ -341,6 +419,11 @@ const useRealTimeVoice = (): RealTimeVoiceHookReturn => {
     }
     setIsListening(false);
     setCurrentTranscript('');
+    
+    // Reset all counters and state
+    restartCountRef.current = 0;
+    lastRestartTimeRef.current = 0;
+    isRestartingRef.current = false;
   }, []);
 
   const speakWithEmotion = useCallback(async (text: string, emotion?: string) => {
