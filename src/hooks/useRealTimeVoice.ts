@@ -48,7 +48,9 @@ const useRealTimeVoice = (): RealTimeVoiceHookReturn => {
       recognitionRef.current.interimResults = true;
       recognitionRef.current.lang = 'en-US';
       recognitionRef.current.maxAlternatives = 1; // Faster processing
-      recognitionRef.current.serviceURI = ''; // Use default service
+      
+      // Remove serviceURI to use default service and avoid network issues
+      // recognitionRef.current.serviceURI = ''; // Commented out to use default
       
       recognitionRef.current.onresult = (event: any) => {
         let finalTranscript = '';
@@ -95,11 +97,36 @@ const useRealTimeVoice = (): RealTimeVoiceHookReturn => {
          }
         
         if (event.error === 'network') {
-          toast({
-            title: "Network Error",
-            description: "Please check your internet connection",
-            variant: "destructive"
-          });
+          console.log('Speech recognition network error, attempting to restart...');
+          // Try to restart speech recognition after network error
+          if (recognitionRef.current && isListening && !isRestartingRef.current) {
+            isRestartingRef.current = true;
+            setTimeout(() => {
+              if (isListening && recognitionRef.current) {
+                try {
+                  recognitionRef.current.start();
+                  console.log('Restarted after network error');
+                } catch (e) {
+                  console.log('Failed to restart after network error:', e);
+                  toast({
+                    title: "Voice Recognition Error",
+                    description: "Please refresh the page and try again",
+                    variant: "destructive"
+                  });
+                } finally {
+                  isRestartingRef.current = false;
+                }
+              } else {
+                isRestartingRef.current = false;
+              }
+            }, 1000); // Longer delay for network errors
+          } else {
+            toast({
+              title: "Network Error",
+              description: "Please check your internet connection and try again",
+              variant: "destructive"
+            });
+          }
           return;
         }
         
@@ -183,6 +210,9 @@ const useRealTimeVoice = (): RealTimeVoiceHookReturn => {
         return;
       }
 
+      // Add a small delay to ensure proper initialization
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
       recognitionRef.current.start();
       setIsListening(true);
       
