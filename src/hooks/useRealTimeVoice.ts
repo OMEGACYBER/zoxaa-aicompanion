@@ -65,6 +65,33 @@ const useRealTimeVoice = (): RealTimeVoiceHookReturn => {
         });
       }
       
+      // Add network connectivity check
+      const checkNetworkConnectivity = async () => {
+        try {
+          const response = await fetch('https://www.google.com', { 
+            method: 'HEAD',
+            mode: 'no-cors'
+          });
+          console.log('✅ Network connectivity confirmed');
+          return true;
+        } catch (error) {
+          console.log('❌ Network connectivity issue detected');
+          return false;
+        }
+      };
+      
+      // Check network before initializing speech recognition
+      checkNetworkConnectivity().then(isConnected => {
+        if (!isConnected) {
+          console.log('⚠️ Network issues detected, speech recognition may fail');
+          toast({
+            title: "Network Warning",
+            description: "Speech recognition may not work due to network issues. Text input is available.",
+            variant: "default"
+          });
+        }
+      });
+      
       recognitionRef.current.onresult = (event: any) => {
         let finalTranscript = '';
         let interimTranscript = '';
@@ -109,53 +136,42 @@ const useRealTimeVoice = (): RealTimeVoiceHookReturn => {
            return;
          }
         
-        if (event.error === 'network') {
-          console.log('Speech recognition network error, attempting to restart...');
-          // Try to restart speech recognition after network error with exponential backoff
-          if (recognitionRef.current && isListening && !isRestartingRef.current) {
-            isRestartingRef.current = true;
-            const retryDelay = Math.min(1000 * Math.pow(2, restartCountRef.current), 5000); // Max 5 seconds
+                                   if (event.error === 'network') {
+            console.log('Speech recognition network error, attempting enhanced recovery...');
             
-            setTimeout(() => {
-              if (isListening && recognitionRef.current) {
-                try {
-                  recognitionRef.current.start();
-                  console.log('Restarted after network error');
-                  restartCountRef.current = 0; // Reset on success
-                } catch (e) {
-                  console.log('Failed to restart after network error:', e);
-                  restartCountRef.current++;
-                  
-                  if (restartCountRef.current < 5) {
-                    console.log(`Retrying network error recovery (${restartCountRef.current}/5)...`);
-                    // Don't show error toast yet, keep trying
-                  } else {
-                    console.log('Too many network errors, showing user message');
-                    toast({
-                      title: "Voice Recognition Error",
-                      description: "Please check your internet connection and refresh the page",
-                      variant: "destructive"
-                    });
-                  }
-                } finally {
-                  isRestartingRef.current = false;
-                }
+            if (recognitionRef.current && isListening && !isRestartingRef.current) {
+              isRestartingRef.current = true;
+              restartCountRef.current++;
+              
+              if (restartCountRef.current <= 2) {
+                // Try enhanced recovery first
+                handleNetworkError();
               } else {
-                isRestartingRef.current = false;
+                // After 2 attempts, show user-friendly message
+                console.log('Too many network errors, offering alternatives');
+                toast({
+                  title: "Speech Recognition Unavailable",
+                  description: "Network issues detected. You can still use text input to chat with ZOXAA.",
+                  variant: "default"
+                });
+                setIsListening(false);
               }
-            }, retryDelay);
-          } else {
-            // Only show error if we're not in retry mode
-            if (restartCountRef.current === 0) {
-              toast({
-                title: "Network Error",
-                description: "Please check your internet connection and try again",
-                variant: "destructive"
-              });
+              
+              setTimeout(() => {
+                isRestartingRef.current = false;
+              }, 2000);
+            } else {
+              // Only show error if we're not in retry mode
+              if (restartCountRef.current === 0) {
+                toast({
+                  title: "Network Error",
+                  description: "Speech recognition unavailable. Please use text input instead.",
+                  variant: "default"
+                });
+              }
             }
+            return;
           }
-          return;
-        }
         
         if (event.error === 'not-allowed') {
           toast({
@@ -394,6 +410,63 @@ const useRealTimeVoice = (): RealTimeVoiceHookReturn => {
     }
   }, []);
 
+  // Fallback: Manual voice input when speech recognition fails
+  const startManualVoiceInput = useCallback(async () => {
+    try {
+      // Show a prompt for manual voice input
+      toast({
+        title: "Voice Input Alternative",
+        description: "Speech recognition unavailable. Please use text input or try refreshing the page.",
+        variant: "default"
+      });
+      
+      // You can add a text input fallback here
+      console.log('Manual voice input mode activated');
+    } catch (error) {
+      console.error('Failed to start manual voice input:', error);
+    }
+  }, [toast]);
+
+  // Enhanced network error recovery
+  const handleNetworkError = useCallback(async () => {
+    console.log('🔄 Attempting network error recovery...');
+    
+    // Try to restart speech recognition with different settings
+    if (recognitionRef.current) {
+      try {
+        // Stop current recognition
+        recognitionRef.current.stop();
+        
+        // Wait a moment
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Try to restart with different settings
+        recognitionRef.current.continuous = false; // Try non-continuous mode
+        recognitionRef.current.interimResults = false; // Try without interim results
+        
+        recognitionRef.current.start();
+        console.log('✅ Speech recognition restarted with alternative settings');
+        
+        // Reset to original settings after successful start
+        setTimeout(() => {
+          if (recognitionRef.current) {
+            recognitionRef.current.continuous = true;
+            recognitionRef.current.interimResults = true;
+          }
+        }, 2000);
+        
+      } catch (error) {
+        console.log('❌ Alternative settings also failed:', error);
+        toast({
+          title: "Speech Recognition Unavailable",
+          description: "Please use text input to chat with ZOXAA. Voice features will be disabled.",
+          variant: "default"
+        });
+        setIsListening(false);
+      }
+    }
+  }, [toast]);
+
   return {
     isListening,
     isSpeaking,
@@ -403,7 +476,8 @@ const useRealTimeVoice = (): RealTimeVoiceHookReturn => {
     speakWithEmotion,
     stopSpeaking,
     clearTranscript,
-    setVoiceSettings
+    setVoiceSettings,
+    startManualVoiceInput
   };
 };
 
