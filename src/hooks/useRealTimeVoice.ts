@@ -36,6 +36,7 @@ const useRealTimeVoice = (): RealTimeVoiceHookReturn => {
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
   const recognitionRef = useRef<any>(null);
   const restartCountRef = useRef<number>(0);
+  const isRestartingRef = useRef<boolean>(false);
   const { toast } = useToast();
 
   // Initialize Web Speech API for real-time transcription
@@ -72,23 +73,23 @@ const useRealTimeVoice = (): RealTimeVoiceHookReturn => {
          // Handle specific error types
          if (event.error === 'no-speech') {
            console.log('No speech detected, continuing to listen...');
-           // For no-speech, immediately restart to keep listening
-           if (recognitionRef.current) {
-             try {
-               recognitionRef.current.start();
-               console.log('Restarted after no-speech error');
-             } catch (e) {
-               console.log('Failed to restart after no-speech:', e);
-               // Try again after a short delay
-               setTimeout(() => {
+           // For no-speech, restart after a delay to prevent rapid restarts
+           if (recognitionRef.current && isListening && !isRestartingRef.current) {
+             isRestartingRef.current = true;
+             setTimeout(() => {
+               if (isListening && recognitionRef.current) {
                  try {
                    recognitionRef.current.start();
-                   console.log('Second restart attempt after no-speech');
-                 } catch (e2) {
-                   console.log('Second restart attempt failed:', e2);
+                   console.log('Restarted after no-speech error');
+                 } catch (e) {
+                   console.log('Failed to restart after no-speech:', e);
+                 } finally {
+                   isRestartingRef.current = false;
                  }
-               }, 100);
-             }
+               } else {
+                 isRestartingRef.current = false;
+               }
+             }, 500); // Increased delay to prevent conflicts
            }
            return;
          }
@@ -125,10 +126,11 @@ const useRealTimeVoice = (): RealTimeVoiceHookReturn => {
 
       recognitionRef.current.onend = () => {
         console.log('Speech recognition ended');
-        // Only restart if we're supposed to be listening
-        if (isListening && recognitionRef.current) {
+        // Only restart if we're supposed to be listening and not already restarting
+        if (isListening && recognitionRef.current && !isRestartingRef.current) {
           console.log('Restarting speech recognition from onend...');
-          // Add a small delay to prevent rapid restarts
+          isRestartingRef.current = true;
+          // Add a longer delay to prevent rapid restarts
           setTimeout(() => {
             if (isListening && recognitionRef.current) {
               try {
@@ -138,9 +140,13 @@ const useRealTimeVoice = (): RealTimeVoiceHookReturn => {
                 console.log('Failed to restart from onend:', e);
                 // If restart fails, stop listening
                 setIsListening(false);
+              } finally {
+                isRestartingRef.current = false;
               }
+            } else {
+              isRestartingRef.current = false;
             }
-          }, 100);
+          }, 300); // Increased delay to prevent conflicts
         }
       };
     }
