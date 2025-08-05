@@ -32,10 +32,35 @@ const VoiceChatInterface = ({ className }: VoiceChatInterfaceProps) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
-  // Mobile detection
+  // Enhanced mobile detection
   const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
   const isAndroid = /Android/.test(navigator.userAgent);
+  const isTablet = /iPad|Android(?!.*Mobile)/i.test(navigator.userAgent);
+  const isPhone = isMobile && !isTablet;
+  
+  // Screen size detection for better responsiveness
+  const [screenSize, setScreenSize] = useState({
+    width: typeof window !== 'undefined' ? window.innerWidth : 0,
+    height: typeof window !== 'undefined' ? window.innerHeight : 0
+  });
+
+  // Update screen size on resize
+  useEffect(() => {
+    const handleResize = () => {
+      setScreenSize({
+        width: window.innerWidth,
+        height: window.innerHeight
+      });
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Enhanced mobile detection with screen size
+  const isMobileView = isMobile || screenSize.width < 768;
+  const isSmallScreen = screenSize.width < 480;
 
   // Custom hooks
   const { messages, isThinking, sendMessage, addMessage } = useZoxaaChat();
@@ -109,7 +134,7 @@ const VoiceChatInterface = ({ className }: VoiceChatInterfaceProps) => {
     } else {
       // Start voice conversation with mobile-specific handling
       try {
-        if (isMobile) {
+        if (isMobileView) {
           // Show mobile-specific instructions
           toast({
             title: "Mobile Voice Mode",
@@ -123,7 +148,7 @@ const VoiceChatInterface = ({ className }: VoiceChatInterfaceProps) => {
         await startRealTimeListening();
         setIsVoiceActive(true);
         
-        const message = isMobile 
+        const message = isMobileView 
           ? "Voice mode active on mobile. Tap to speak."
           : "I'm listening to you in real-time...";
           
@@ -135,7 +160,7 @@ const VoiceChatInterface = ({ className }: VoiceChatInterfaceProps) => {
         console.error('Failed to start voice chat:', error);
         
         // Mobile-specific error handling
-        if (isMobile) {
+        if (isMobileView) {
           toast({
             title: "Mobile Voice Issue",
             description: "Voice recognition may not work on mobile. Please use text input.",
@@ -172,18 +197,37 @@ const VoiceChatInterface = ({ className }: VoiceChatInterfaceProps) => {
   };
 
   return (
-    <div className={cn("flex flex-col h-full bg-gradient-background", className)}>
+    <div className={cn(
+      "flex flex-col h-full bg-gradient-background",
+      isMobileView && "min-h-screen",
+      className
+    )}>
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-border bg-card/50 backdrop-blur-sm">
+      <div className={cn(
+        "flex items-center justify-between border-b border-border bg-card/50 backdrop-blur-sm",
+        isMobileView ? "p-3" : "p-4"
+      )}>
         <div className="flex items-center gap-3">
-          <Avatar className="w-10 h-10 bg-gradient-primary">
+          <Avatar className={cn(
+            "bg-gradient-primary",
+            isMobileView ? "w-8 h-8" : "w-10 h-10"
+          )}>
             <AvatarFallback className="bg-transparent">
-              <Brain className="w-5 h-5 text-primary-foreground" />
+              <Brain className={cn(
+                "text-primary-foreground",
+                isMobileView ? "w-4 h-4" : "w-5 h-5"
+              )} />
             </AvatarFallback>
           </Avatar>
           <div>
-            <h2 className="font-semibold">Zoxaa Voice</h2>
-            <p className="text-sm text-muted-foreground">
+            <h2 className={cn(
+              "font-semibold",
+              isMobileView ? "text-sm" : "text-base"
+            )}>Zoxaa Voice</h2>
+            <p className={cn(
+              "text-muted-foreground",
+              isMobileView ? "text-xs" : "text-sm"
+            )}>
               {isVoiceActive ? "Real-time voice conversation" : "Voice chat ready"}
             </p>
           </div>
@@ -194,18 +238,33 @@ const VoiceChatInterface = ({ className }: VoiceChatInterfaceProps) => {
 
       {/* Voice Activity Visualization */}
       {isVoiceActive && (
-        <div className="p-4 bg-accent/5 border-b border-accent/20">
-          <div className="flex items-center justify-between mb-2">
+        <div className={cn(
+          "bg-accent/5 border-b border-accent/20",
+          isMobileView ? "p-3" : "p-4"
+        )}>
+          <div className={cn(
+            "flex items-center justify-between mb-2",
+            isMobileView && "flex-col gap-2 items-start"
+          )}>
             <div className="flex items-center gap-2">
-              <Activity className="w-4 h-4 text-accent" />
-              <span className="text-sm font-medium text-accent">Voice Activity</span>
+              <Activity className={cn(
+                "text-accent",
+                isMobileView ? "w-3 h-3" : "w-4 h-4"
+              )} />
+              <span className={cn(
+                "font-medium text-accent",
+                isMobileView ? "text-xs" : "text-sm"
+              )}>Voice Activity</span>
             </div>
             <div className="flex items-center gap-2">
               <Heart className={cn(
-                "w-4 h-4",
-                currentEmotion === 'happy' || currentEmotion === 'excited' ? "text-red-500" : "text-muted-foreground"
+                currentEmotion === 'happy' || currentEmotion === 'excited' ? "text-red-500" : "text-muted-foreground",
+                isMobileView ? "w-3 h-3" : "w-4 h-4"
               )} />
-              <span className="text-xs text-muted-foreground capitalize">{currentEmotion}</span>
+              <span className={cn(
+                "text-muted-foreground capitalize",
+                isMobileView ? "text-xs" : "text-xs"
+              )}>{currentEmotion}</span>
             </div>
           </div>
           
@@ -227,7 +286,10 @@ const VoiceChatInterface = ({ className }: VoiceChatInterfaceProps) => {
       )}
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className={cn(
+        "flex-1 overflow-y-auto space-y-4",
+        isMobileView ? "p-3" : "p-4"
+      )}>
         {messages.map((message) => (
           <div
             key={message.id}
@@ -237,24 +299,38 @@ const VoiceChatInterface = ({ className }: VoiceChatInterfaceProps) => {
             )}
           >
             {message.role === "assistant" && (
-              <Avatar className="w-8 h-8 bg-gradient-primary">
+              <Avatar className={cn(
+                "bg-gradient-primary",
+                isMobileView ? "w-6 h-6" : "w-8 h-8"
+              )}>
                 <AvatarFallback className="bg-transparent">
-                  <Brain className="w-4 h-4 text-primary-foreground" />
+                  <Brain className={cn(
+                    "text-primary-foreground",
+                    isMobileView ? "w-3 h-3" : "w-4 h-4"
+                  )} />
                 </AvatarFallback>
               </Avatar>
             )}
 
             <Card className={cn(
-              "max-w-[80%] p-4 bg-gradient-card group relative",
+              "bg-gradient-card group relative",
               message.role === "user" 
                 ? "bg-gradient-primary text-primary-foreground" 
-                : "border-primary/20"
+                : "border-primary/20",
+              isMobileView ? "max-w-[90%] p-3" : "max-w-[80%] p-4"
             )}>
-              <p className="text-sm leading-relaxed">{message.content}</p>
+              <p className={cn(
+                "leading-relaxed",
+                isMobileView ? "text-xs" : "text-sm"
+              )}>{message.content}</p>
               <div className="flex items-center justify-between mt-2">
                 <div className="flex items-center gap-1 opacity-70">
-                  <MessageCircle className="w-3 h-3" />
-                  <span className="text-xs">
+                  <MessageCircle className={cn(
+                    isMobileView ? "w-2 h-2" : "w-3 h-3"
+                  )} />
+                  <span className={cn(
+                    isMobileView ? "text-xs" : "text-xs"
+                  )}>
                     {message.timestamp.toLocaleTimeString([], { 
                       hour: '2-digit', 
                       minute: '2-digit' 
@@ -265,9 +341,15 @@ const VoiceChatInterface = ({ className }: VoiceChatInterfaceProps) => {
             </Card>
 
             {message.role === "user" && (
-              <Avatar className="w-8 h-8 bg-secondary">
+              <Avatar className={cn(
+                "bg-secondary",
+                isMobileView ? "w-6 h-6" : "w-8 h-8"
+              )}>
                 <AvatarFallback className="bg-transparent">
-                  <User className="w-4 h-4 text-secondary-foreground" />
+                  <User className={cn(
+                    "text-secondary-foreground",
+                    isMobileView ? "w-3 h-3" : "w-4 h-4"
+                  )} />
                 </AvatarFallback>
               </Avatar>
             )}
@@ -276,19 +358,40 @@ const VoiceChatInterface = ({ className }: VoiceChatInterfaceProps) => {
 
         {isThinking && (
           <div className="flex gap-3 justify-start">
-            <Avatar className="w-8 h-8 bg-gradient-primary">
+            <Avatar className={cn(
+              "bg-gradient-primary",
+              isMobileView ? "w-6 h-6" : "w-8 h-8"
+            )}>
               <AvatarFallback className="bg-transparent">
-                <Brain className="w-4 h-4 text-primary-foreground" />
+                <Brain className={cn(
+                  "text-primary-foreground",
+                  isMobileView ? "w-3 h-3" : "w-4 h-4"
+                )} />
               </AvatarFallback>
             </Avatar>
-            <Card className="p-4 bg-ai-thinking/20 border-primary/20">
+            <Card className={cn(
+              "bg-ai-thinking/20 border-primary/20",
+              isMobileView ? "p-3" : "p-4"
+            )}>
               <div className="flex items-center gap-2">
                 <div className="flex gap-1">
-                  <div className="w-2 h-2 bg-primary rounded-full animate-bounce [animation-delay:-0.3s]"></div>
-                  <div className="w-2 h-2 bg-primary rounded-full animate-bounce [animation-delay:-0.15s]"></div>
-                  <div className="w-2 h-2 bg-primary rounded-full animate-bounce"></div>
+                  <div className={cn(
+                    "bg-primary rounded-full animate-bounce [animation-delay:-0.3s]",
+                    isMobileView ? "w-1.5 h-1.5" : "w-2 h-2"
+                  )}></div>
+                  <div className={cn(
+                    "bg-primary rounded-full animate-bounce [animation-delay:-0.15s]",
+                    isMobileView ? "w-1.5 h-1.5" : "w-2 h-2"
+                  )}></div>
+                  <div className={cn(
+                    "bg-primary rounded-full animate-bounce",
+                    isMobileView ? "w-1.5 h-1.5" : "w-2 h-2"
+                  )}></div>
                 </div>
-                <span className="text-sm text-muted-foreground">Zoxaa is thinking...</span>
+                <span className={cn(
+                  "text-muted-foreground",
+                  isMobileView ? "text-xs" : "text-sm"
+                )}>Zoxaa is thinking...</span>
               </div>
             </Card>
           </div>
@@ -298,30 +401,53 @@ const VoiceChatInterface = ({ className }: VoiceChatInterfaceProps) => {
       </div>
 
       {/* Voice Controls */}
-      <div className="p-4 border-t border-border bg-card/50 backdrop-blur-sm">
+      <div className={cn(
+        "border-t border-border bg-card/50 backdrop-blur-sm",
+        isMobileView ? "p-3" : "p-4"
+      )}>
         {isVoiceActive ? (
           <div className="space-y-4">
             {/* Current Transcript Display */}
             {currentTranscript && (
-              <Card className="p-3 bg-accent/10 border-accent/20">
+              <Card className={cn(
+                "bg-accent/10 border-accent/20",
+                isMobileView ? "p-2" : "p-3"
+              )}>
                 <div className="flex items-center gap-2 mb-2">
-                  <BarChart3 className="w-4 h-4 text-accent" />
-                  <span className="text-sm font-medium text-accent">You're saying:</span>
+                  <BarChart3 className={cn(
+                    "text-accent",
+                    isMobileView ? "w-3 h-3" : "w-4 h-4"
+                  )} />
+                  <span className={cn(
+                    "font-medium text-accent",
+                    isMobileView ? "text-xs" : "text-sm"
+                  )}>You're saying:</span>
                 </div>
-                <p className="text-sm text-muted-foreground">{currentTranscript}</p>
-                <div className="flex gap-2 mt-3">
+                <p className={cn(
+                  "text-muted-foreground",
+                  isMobileView ? "text-xs" : "text-sm"
+                )}>{currentTranscript}</p>
+                <div className={cn(
+                  "flex gap-2 mt-3",
+                  isMobileView && "flex-col"
+                )}>
                   <Button
-                    size="sm"
+                    size={isMobileView ? "sm" : "sm"}
                     onClick={handleSendVoiceMessage}
                     disabled={!currentTranscript.trim()}
+                    className={isMobileView ? "w-full" : ""}
                   >
-                    <Zap className="w-4 h-4 mr-1" />
+                    <Zap className={cn(
+                      "mr-1",
+                      isMobileView ? "w-3 h-3" : "w-4 h-4"
+                    )} />
                     Send
                   </Button>
                   <Button
                     variant="outline"
-                    size="sm"
+                    size={isMobileView ? "sm" : "sm"}
                     onClick={() => window.speechSynthesis?.cancel()}
+                    className={isMobileView ? "w-full" : ""}
                   >
                     Clear
                   </Button>
@@ -332,23 +458,23 @@ const VoiceChatInterface = ({ className }: VoiceChatInterfaceProps) => {
             {/* Voice Control Buttons */}
             <div className={cn(
               "flex items-center justify-center gap-4",
-              isMobile && "flex-col gap-2"
+              isMobileView && "flex-col gap-2"
             )}>
               <Button
                 variant={isSpeaking ? "destructive" : "secondary"}
-                size={isMobile ? "default" : "lg"}
+                size={isMobileView ? "default" : "lg"}
                 onClick={isSpeaking ? handleInterrupt : undefined}
                 disabled={!isSpeaking}
-                className={isMobile ? "w-full" : ""}
+                className={isMobileView ? "w-full" : ""}
               >
                 {isSpeaking ? (
                   <>
-                    <VolumeX className={cn("mr-2", isMobile ? "w-4 h-4" : "w-5 h-5")} />
+                    <VolumeX className={cn("mr-2", isMobileView ? "w-4 h-4" : "w-5 h-5")} />
                     Interrupt
                   </>
                 ) : (
                   <>
-                    <Volume2 className={cn("mr-2", isMobile ? "w-4 h-4" : "w-5 h-5")} />
+                    <Volume2 className={cn("mr-2", isMobileView ? "w-4 h-4" : "w-5 h-5")} />
                     Zoxaa Speaking
                   </>
                 )}
@@ -356,14 +482,14 @@ const VoiceChatInterface = ({ className }: VoiceChatInterfaceProps) => {
 
               <Button
                 variant="destructive"
-                size={isMobile ? "default" : "lg"}
+                size={isMobileView ? "default" : "lg"}
                 onClick={handleVoiceToggle}
                 className={cn(
                   "animate-pulse",
-                  isMobile && "w-full"
+                  isMobileView && "w-full"
                 )}
               >
-                <MicOff className={cn("mr-2", isMobile ? "w-4 h-4" : "w-5 h-5")} />
+                <MicOff className={cn("mr-2", isMobileView ? "w-4 h-4" : "w-5 h-5")} />
                 End Voice Chat
               </Button>
             </div>
@@ -371,7 +497,7 @@ const VoiceChatInterface = ({ className }: VoiceChatInterfaceProps) => {
             {/* Status Indicators */}
             <div className={cn(
               "flex items-center justify-center text-xs text-muted-foreground",
-              isMobile ? "flex-col gap-2" : "gap-6"
+              isMobileView ? "flex-col gap-2" : "gap-6"
             )}>
               <div className="flex items-center gap-1">
                 <div className={cn(
@@ -399,33 +525,39 @@ const VoiceChatInterface = ({ className }: VoiceChatInterfaceProps) => {
         ) : (
           <div className="flex flex-col items-center gap-4">
             <div className="text-center">
-              <h3 className="font-semibold mb-2">Start Voice Conversation</h3>
-              <p className="text-sm text-muted-foreground mb-4">
+              <h3 className={cn(
+                "font-semibold mb-2",
+                isMobileView ? "text-sm" : "text-base"
+              )}>Start Voice Conversation</h3>
+              <p className={cn(
+                "text-muted-foreground mb-4",
+                isMobileView ? "text-xs" : "text-sm"
+              )}>
                 Have a natural conversation with Zoxaa using your voice
               </p>
             </div>
             
             <Button
               variant="empathy"
-              size={isMobile ? "default" : "lg"}
+              size={isMobileView ? "default" : "lg"}
               onClick={handleVoiceToggle}
               className={cn(
                 "animate-pulse",
-                isMobile && "w-full max-w-xs"
+                isMobileView && "w-full max-w-xs"
               )}
             >
-              <Mic className={cn("mr-2", isMobile ? "w-4 h-4" : "w-5 h-5")} />
-              {isMobile ? "Start Voice Chat" : "Start Voice Chat"}
+              <Mic className={cn("mr-2", isMobileView ? "w-4 h-4" : "w-5 h-5")} />
+              Start Voice Chat
             </Button>
           </div>
         )}
 
         <p className="text-xs text-muted-foreground mt-4 text-center">
           {isVoiceActive 
-            ? isMobile 
+            ? isMobileView 
               ? "Mobile voice mode • Tap to speak • Text input available"
               : "Real-time voice conversation • Emotion-aware responses • Natural flow"
-            : isMobile
+            : isMobileView
               ? "Tap to start voice conversation with Zoxaa"
               : "Click to start a voice conversation with Zoxaa"
           }
