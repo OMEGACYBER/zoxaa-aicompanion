@@ -32,6 +32,11 @@ const VoiceChatInterface = ({ className }: VoiceChatInterfaceProps) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
+  // Mobile detection
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  const isAndroid = /Android/.test(navigator.userAgent);
+
   // Custom hooks
   const { messages, isThinking, sendMessage, addMessage } = useZoxaaChat();
   const { 
@@ -102,16 +107,41 @@ const VoiceChatInterface = ({ className }: VoiceChatInterfaceProps) => {
         description: "Switched back to text mode"
       });
     } else {
-      // Start voice conversation
+      // Start voice conversation with mobile-specific handling
       try {
+        if (isMobile) {
+          // Show mobile-specific instructions
+          toast({
+            title: "Mobile Voice Mode",
+            description: isIOS 
+              ? "Tap and hold the microphone button to speak" 
+              : "Tap the microphone button to start voice input",
+            variant: "default"
+          });
+        }
+        
         await startRealTimeListening();
         setIsVoiceActive(true);
+        
+        const message = isMobile 
+          ? "Voice mode active on mobile. Tap to speak."
+          : "I'm listening to you in real-time...";
+          
         toast({
           title: "Voice Chat Active",
-          description: "I'm listening to you in real-time..."
+          description: message
         });
       } catch (error) {
         console.error('Failed to start voice chat:', error);
+        
+        // Mobile-specific error handling
+        if (isMobile) {
+          toast({
+            title: "Mobile Voice Issue",
+            description: "Voice recognition may not work on mobile. Please use text input.",
+            variant: "destructive"
+          });
+        }
       }
     }
   };
@@ -300,21 +330,25 @@ const VoiceChatInterface = ({ className }: VoiceChatInterfaceProps) => {
             )}
 
             {/* Voice Control Buttons */}
-            <div className="flex items-center justify-center gap-4">
+            <div className={cn(
+              "flex items-center justify-center gap-4",
+              isMobile && "flex-col gap-2"
+            )}>
               <Button
                 variant={isSpeaking ? "destructive" : "secondary"}
-                size="lg"
+                size={isMobile ? "default" : "lg"}
                 onClick={isSpeaking ? handleInterrupt : undefined}
                 disabled={!isSpeaking}
+                className={isMobile ? "w-full" : ""}
               >
                 {isSpeaking ? (
                   <>
-                    <VolumeX className="w-5 h-5 mr-2" />
+                    <VolumeX className={cn("mr-2", isMobile ? "w-4 h-4" : "w-5 h-5")} />
                     Interrupt
                   </>
                 ) : (
                   <>
-                    <Volume2 className="w-5 h-5 mr-2" />
+                    <Volume2 className={cn("mr-2", isMobile ? "w-4 h-4" : "w-5 h-5")} />
                     Zoxaa Speaking
                   </>
                 )}
@@ -322,17 +356,23 @@ const VoiceChatInterface = ({ className }: VoiceChatInterfaceProps) => {
 
               <Button
                 variant="destructive"
-                size="lg"
+                size={isMobile ? "default" : "lg"}
                 onClick={handleVoiceToggle}
-                className="animate-pulse"
+                className={cn(
+                  "animate-pulse",
+                  isMobile && "w-full"
+                )}
               >
-                <MicOff className="w-5 h-5 mr-2" />
+                <MicOff className={cn("mr-2", isMobile ? "w-4 h-4" : "w-5 h-5")} />
                 End Voice Chat
               </Button>
             </div>
 
             {/* Status Indicators */}
-            <div className="flex items-center justify-center gap-6 text-xs text-muted-foreground">
+            <div className={cn(
+              "flex items-center justify-center text-xs text-muted-foreground",
+              isMobile ? "flex-col gap-2" : "gap-6"
+            )}>
               <div className="flex items-center gap-1">
                 <div className={cn(
                   "w-2 h-2 rounded-full",
@@ -367,20 +407,27 @@ const VoiceChatInterface = ({ className }: VoiceChatInterfaceProps) => {
             
             <Button
               variant="empathy"
-              size="lg"
+              size={isMobile ? "default" : "lg"}
               onClick={handleVoiceToggle}
-              className="animate-pulse"
+              className={cn(
+                "animate-pulse",
+                isMobile && "w-full max-w-xs"
+              )}
             >
-              <Mic className="w-5 h-5 mr-2" />
-              Start Voice Chat
+              <Mic className={cn("mr-2", isMobile ? "w-4 h-4" : "w-5 h-5")} />
+              {isMobile ? "Start Voice Chat" : "Start Voice Chat"}
             </Button>
           </div>
         )}
 
         <p className="text-xs text-muted-foreground mt-4 text-center">
           {isVoiceActive 
-            ? "Real-time voice conversation • Emotion-aware responses • Natural flow"
-            : "Click to start a voice conversation with Zoxaa"
+            ? isMobile 
+              ? "Mobile voice mode • Tap to speak • Text input available"
+              : "Real-time voice conversation • Emotion-aware responses • Natural flow"
+            : isMobile
+              ? "Tap to start voice conversation with Zoxaa"
+              : "Click to start a voice conversation with Zoxaa"
           }
         </p>
       </div>
