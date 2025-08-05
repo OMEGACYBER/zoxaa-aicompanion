@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Input } from "@/components/ui/input";
 import { 
   Mic, 
   MicOff, 
@@ -13,7 +14,9 @@ import {
   Activity,
   Zap,
   Heart,
-  MessageCircle
+  MessageCircle,
+  AlertTriangle,
+  CheckCircle
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -29,6 +32,7 @@ const VoiceChatInterface = ({ className }: VoiceChatInterfaceProps) => {
   const [conversationHistory, setConversationHistory] = useState<string[]>([]);
   const [currentEmotion, setCurrentEmotion] = useState<string>('neutral');
   const [voiceActivity, setVoiceActivity] = useState<number>(0);
+  const [showBrowserInfo, setShowBrowserInfo] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
@@ -38,6 +42,10 @@ const VoiceChatInterface = ({ className }: VoiceChatInterfaceProps) => {
   const isAndroid = /Android/.test(navigator.userAgent);
   const isTablet = /iPad|Android(?!.*Mobile)/i.test(navigator.userAgent);
   const isPhone = isMobile && !isTablet;
+  const isChrome = /Chrome/.test(navigator.userAgent);
+  const isSafari = /Safari/.test(navigator.userAgent) && !/Chrome/.test(navigator.userAgent);
+  const isFirefox = /Firefox/.test(navigator.userAgent);
+  const isEdge = /Edg/.test(navigator.userAgent);
   
   // Screen size detection for better responsiveness
   const [screenSize, setScreenSize] = useState({
@@ -68,10 +76,13 @@ const VoiceChatInterface = ({ className }: VoiceChatInterfaceProps) => {
     isListening, 
     isSpeaking, 
     currentTranscript, 
+    voiceSupported,
+    permissionGranted,
     startRealTimeListening, 
     stopRealTimeListening, 
     speakWithEmotion, 
-    stopSpeaking 
+    stopSpeaking,
+    requestMicrophonePermission
   } = useRealTimeVoice();
 
   const scrollToBottom = () => {
@@ -121,6 +132,14 @@ const VoiceChatInterface = ({ className }: VoiceChatInterfaceProps) => {
     return 'neutral';
   };
 
+  const getBrowserInfo = () => {
+    const browser = isChrome ? 'Chrome' : isSafari ? 'Safari' : isFirefox ? 'Firefox' : isEdge ? 'Edge' : 'Unknown';
+    const device = isMobile ? (isIOS ? 'iOS' : isAndroid ? 'Android' : 'Mobile') : 'Desktop';
+    const secure = window.location.protocol === 'https:' || window.location.hostname === 'localhost';
+    
+    return { browser, device, secure };
+  };
+
   const handleVoiceToggle = async () => {
     if (isVoiceActive) {
       // Stop voice conversation
@@ -132,10 +151,33 @@ const VoiceChatInterface = ({ className }: VoiceChatInterfaceProps) => {
         description: "Switched back to text mode"
       });
     } else {
-      // Start voice conversation with mobile-specific handling
+      // Start voice conversation with enhanced error handling
       try {
+        // Check if voice is supported
+        if (!voiceSupported) {
+          toast({
+            title: "Voice Not Supported",
+            description: "Voice recognition is not supported in your browser. Please use text input.",
+            variant: "destructive"
+          });
+          return;
+        }
+
+        // Request microphone permission if needed
+        if (!permissionGranted) {
+          const permissionGranted = await requestMicrophonePermission();
+          if (!permissionGranted) {
+            toast({
+              title: "Microphone Permission Required",
+              description: "Voice features require microphone access. Please allow microphone access and try again.",
+              variant: "destructive"
+            });
+            return;
+          }
+        }
+
+        // Show device-specific instructions
         if (isMobileView) {
-          // Show mobile-specific instructions
           toast({
             title: "Mobile Voice Mode",
             description: isIOS 
@@ -159,11 +201,17 @@ const VoiceChatInterface = ({ className }: VoiceChatInterfaceProps) => {
       } catch (error) {
         console.error('Failed to start voice chat:', error);
         
-        // Mobile-specific error handling
+        // Provide helpful error messages
         if (isMobileView) {
           toast({
             title: "Mobile Voice Issue",
             description: "Voice recognition may not work on mobile. Please use text input.",
+            variant: "destructive"
+          });
+        } else {
+          toast({
+            title: "Voice Error",
+            description: "Unable to start voice recognition. Please use text input.",
             variant: "destructive"
           });
         }
@@ -228,13 +276,119 @@ const VoiceChatInterface = ({ className }: VoiceChatInterfaceProps) => {
               "text-muted-foreground",
               isMobileView ? "text-xs" : "text-sm"
             )}>
-              {isVoiceActive ? "Real-time voice conversation" : "Voice chat ready"}
+              {!voiceSupported 
+                ? "Voice not supported - use text input"
+                : !permissionGranted 
+                  ? "Microphone permission needed"
+                  : isVoiceActive 
+                    ? "Real-time voice conversation" 
+                    : "Voice chat ready"
+              }
             </p>
           </div>
         </div>
-
-
       </div>
+
+      {/* Voice Status Indicator */}
+      {!voiceSupported && (
+        <div className={cn(
+          "bg-yellow-500/10 border-yellow-500/20 border-b",
+          isMobileView ? "p-3" : "p-4"
+        )}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className={cn(
+                "text-yellow-500",
+                isMobileView ? "w-4 h-4" : "w-5 h-5"
+              )} />
+              <span className={cn(
+                "text-yellow-700 dark:text-yellow-300",
+                isMobileView ? "text-xs" : "text-sm"
+              )}>
+                Voice not supported in this browser. Text input is available.
+              </span>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowBrowserInfo(!showBrowserInfo)}
+              className="text-yellow-600 hover:text-yellow-700"
+            >
+              {showBrowserInfo ? "Hide" : "Info"}
+            </Button>
+          </div>
+          
+          {showBrowserInfo && (
+            <div className="mt-3 p-3 bg-yellow-50 dark:bg-yellow-950/20 rounded-md">
+              <div className="space-y-2 text-xs">
+                <div className="flex justify-between">
+                  <span className="font-medium">Browser:</span>
+                  <span>{getBrowserInfo().browser}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="font-medium">Device:</span>
+                  <span>{getBrowserInfo().device}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="font-medium">Secure Connection:</span>
+                  <span className={getBrowserInfo().secure ? "text-green-600" : "text-red-600"}>
+                    {getBrowserInfo().secure ? "Yes" : "No"}
+                  </span>
+                </div>
+                <div className="mt-2 p-2 bg-yellow-100 dark:bg-yellow-900/20 rounded text-xs">
+                  <p className="font-medium mb-1">Voice Support Tips:</p>
+                  <ul className="space-y-1 text-xs">
+                    <li>• Use Chrome, Safari, or Firefox for best voice support</li>
+                    <li>• Ensure you're on HTTPS or localhost</li>
+                    <li>• Allow microphone permissions when prompted</li>
+                    <li>• Text input works on all browsers</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {voiceSupported && !permissionGranted && (
+        <div className={cn(
+          "bg-blue-500/10 border-blue-500/20 border-b",
+          isMobileView ? "p-3" : "p-4"
+        )}>
+          <div className="flex items-center gap-2">
+            <Mic className={cn(
+              "text-blue-500",
+              isMobileView ? "w-4 h-4" : "w-5 h-5"
+            )} />
+            <span className={cn(
+              "text-blue-700 dark:text-blue-300",
+              isMobileView ? "text-xs" : "text-sm"
+            )}>
+              Microphone permission needed for voice features.
+            </span>
+          </div>
+        </div>
+      )}
+
+      {voiceSupported && permissionGranted && (
+        <div className={cn(
+          "bg-green-500/10 border-green-500/20 border-b",
+          isMobileView ? "p-3" : "p-4"
+        )}>
+          <div className="flex items-center gap-2">
+            <CheckCircle className={cn(
+              "text-green-500",
+              isMobileView ? "w-4 h-4" : "w-5 h-5"
+            )} />
+            <span className={cn(
+              "text-green-700 dark:text-green-300",
+              isMobileView ? "text-xs" : "text-sm"
+            )}>
+              Voice features ready. Click to start voice conversation.
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Voice Activity Visualization */}
       {isVoiceActive && (
@@ -528,38 +682,111 @@ const VoiceChatInterface = ({ className }: VoiceChatInterfaceProps) => {
               <h3 className={cn(
                 "font-semibold mb-2",
                 isMobileView ? "text-sm" : "text-base"
-              )}>Start Voice Conversation</h3>
+              )}>
+                {!voiceSupported 
+                  ? "Voice Not Supported"
+                  : !permissionGranted 
+                    ? "Microphone Permission Needed"
+                    : "Start Voice Conversation"
+                }
+              </h3>
               <p className={cn(
                 "text-muted-foreground mb-4",
                 isMobileView ? "text-xs" : "text-sm"
               )}>
-                Have a natural conversation with Zoxaa using your voice
+                {!voiceSupported 
+                  ? "Your browser doesn't support voice recognition. Please use text input to chat with Zoxaa."
+                  : !permissionGranted 
+                    ? "Allow microphone access to use voice features with Zoxaa."
+                    : "Have a natural conversation with Zoxaa using your voice"
+                }
               </p>
             </div>
             
-            <Button
-              variant="empathy"
-              size={isMobileView ? "default" : "lg"}
-              onClick={handleVoiceToggle}
-              className={cn(
-                "animate-pulse",
-                isMobileView && "w-full max-w-xs"
-              )}
-            >
-              <Mic className={cn("mr-2", isMobileView ? "w-4 h-4" : "w-5 h-5")} />
-              Start Voice Chat
-            </Button>
+            {!voiceSupported ? (
+              <div className="w-full space-y-3">
+                <div className="text-center mb-2">
+                  <p className={cn(
+                    "text-muted-foreground",
+                    isMobileView ? "text-xs" : "text-sm"
+                  )}>
+                    Use text input to chat with Zoxaa
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Type your message..."
+                    className="flex-1"
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter' && e.currentTarget.value.trim()) {
+                        sendMessage(e.currentTarget.value.trim());
+                        e.currentTarget.value = '';
+                      }
+                    }}
+                  />
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => {
+                      const input = document.querySelector('input[placeholder="Type your message..."]') as HTMLInputElement;
+                      if (input && input.value.trim()) {
+                        sendMessage(input.value.trim());
+                        input.value = '';
+                      }
+                    }}
+                  >
+                    Send
+                  </Button>
+                </div>
+                <Button
+                  variant="secondary"
+                  size={isMobileView ? "default" : "lg"}
+                  onClick={() => window.location.href = '/chat'}
+                  className={isMobileView && "w-full"}
+                >
+                  <MessageCircle className={cn("mr-2", isMobileView ? "w-4 h-4" : "w-5 h-5")} />
+                  Go to Text Chat
+                </Button>
+              </div>
+            ) : !permissionGranted ? (
+              <Button
+                variant="empathy"
+                size={isMobileView ? "default" : "lg"}
+                onClick={requestMicrophonePermission}
+                className={isMobileView && "w-full max-w-xs"}
+              >
+                <Mic className={cn("mr-2", isMobileView ? "w-4 h-4" : "w-5 h-5")} />
+                Allow Microphone Access
+              </Button>
+            ) : (
+              <Button
+                variant="empathy"
+                size={isMobileView ? "default" : "lg"}
+                onClick={handleVoiceToggle}
+                className={cn(
+                  "animate-pulse",
+                  isMobileView && "w-full max-w-xs"
+                )}
+              >
+                <Mic className={cn("mr-2", isMobileView ? "w-4 h-4" : "w-5 h-5")} />
+                Start Voice Chat
+              </Button>
+            )}
           </div>
         )}
 
         <p className="text-xs text-muted-foreground mt-4 text-center">
-          {isVoiceActive 
-            ? isMobileView 
-              ? "Mobile voice mode • Tap to speak • Text input available"
-              : "Real-time voice conversation • Emotion-aware responses • Natural flow"
-            : isMobileView
-              ? "Tap to start voice conversation with Zoxaa"
-              : "Click to start a voice conversation with Zoxaa"
+          {!voiceSupported 
+            ? "Voice features not available • Text input provided as alternative"
+            : !permissionGranted 
+              ? "Microphone access required for voice features"
+              : isVoiceActive 
+                ? isMobileView 
+                  ? "Mobile voice mode • Tap to speak • Text input available"
+                  : "Real-time voice conversation • Emotion-aware responses • Natural flow"
+                : isMobileView
+                  ? "Tap to start voice conversation with Zoxaa"
+                  : "Click to start a voice conversation with Zoxaa"
           }
         </p>
       </div>
