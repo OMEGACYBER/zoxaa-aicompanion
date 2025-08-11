@@ -1,0 +1,139 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Zoxaa Design System - Empathetic AI Companion */
+
+@layer base {
+  :root {
+    /* Core Brand Colors - Empathetic Blues & Warm Accents */
+    --background: 220 15% 97%;
+    --foreground: 220 30% 15%;
+
+    --card: 220 10% 98%;
+    --card-foreground: 220 25% 20%;
+
+    --popover: 220 8% 98%;
+    --popover-foreground: 220 25% 20%;
+
+    /* Primary - Zoxaa Purple */
+    --primary: 260 85% 58%;
+    --primary-foreground: 220 8% 98%;
+    --primary-glow: 260 95% 72%;
+    
+    /* Secondary - Warm Empathy */
+    --secondary: 220 8% 94%;
+    --secondary-foreground: 220 25% 25%;
+    
+    /* Accent - Warm Orange for Empathy */
+    --accent: 25 95% 65%;
+    --accent-foreground: 220 8% 98%;
+    
+    /* Muted - Soft Grays */
+    --muted: 220 8% 92%;
+    --muted-foreground: 220 15% 55%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 220 8% 98%;
+
+    --border: 220 10% 88%;
+    --input: 220 8% 94%;
+    --ring: 260 85% 58%;
+
+    --radius: 0.75rem;
+
+    /* Zoxaa-specific Design Tokens */
+    --ai-thinking: 260 60% 88%;
+    --ai-speaking: 25 85% 85%;
+    --memory-glow: 260 70% 75%;
+    --plan-success: 142 76% 36%;
+    
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-glow)));
+    --gradient-empathy: linear-gradient(135deg, hsl(var(--accent)), hsl(25 85% 75%));
+    --gradient-background: linear-gradient(180deg, hsl(var(--background)), hsl(220 12% 95%));
+    --gradient-card: linear-gradient(135deg, hsl(var(--card)), hsl(220 8% 96%));
+    
+    /* Shadows */
+    --shadow-soft: 0 4px 20px -4px hsl(var(--primary) / 0.15);
+    --shadow-glow: 0 0 30px hsl(var(--primary-glow) / 0.4);
+    --shadow-memory: 0 8px 32px -8px hsl(var(--memory-glow) / 0.3);
+    
+    /* Animations */
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-bounce: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+
+    --sidebar-background: 220 12% 96%;
+    --sidebar-foreground: 220 25% 25%;
+    --sidebar-primary: 260 85% 58%;
+    --sidebar-primary-foreground: 220 8% 98%;
+    --sidebar-accent: 220 8% 92%;
+    --sidebar-accent-foreground: 220 25% 25%;
+    --sidebar-border: 220 10% 88%;
+    --sidebar-ring: 260 85% 58%;
+  }
+
+  .dark {
+    --background: 220 25% 8%;
+    --foreground: 220 8% 92%;
+
+    --card: 220 25% 10%;
+    --card-foreground: 220 8% 90%;
+
+    --popover: 220 25% 12%;
+    --popover-foreground: 220 8% 88%;
+
+    --primary: 260 85% 68%;
+    --primary-foreground: 220 25% 8%;
+    --primary-glow: 260 95% 82%;
+
+    --secondary: 220 20% 15%;
+    --secondary-foreground: 220 8% 85%;
+
+    --accent: 25 85% 65%;
+    --accent-foreground: 220 25% 8%;
+
+    --muted: 220 20% 18%;
+    --muted-foreground: 220 8% 65%;
+
+    --destructive: 0 75% 55%;
+    --destructive-foreground: 220 8% 98%;
+
+    --border: 220 20% 20%;
+    --input: 220 20% 18%;
+    --ring: 260 85% 68%;
+
+    --ai-thinking: 260 40% 25%;
+    --ai-speaking: 25 65% 35%;
+    --memory-glow: 260 60% 35%;
+    --plan-success: 142 60% 45%;
+
+    --gradient-primary: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-glow)));
+    --gradient-empathy: linear-gradient(135deg, hsl(var(--accent)), hsl(25 75% 55%));
+    --gradient-background: linear-gradient(180deg, hsl(var(--background)), hsl(220 22% 12%));
+    --gradient-card: linear-gradient(135deg, hsl(var(--card)), hsl(220 22% 14%));
+
+    --shadow-soft: 0 4px 20px -4px hsl(var(--primary) / 0.25);
+    --shadow-glow: 0 0 40px hsl(var(--primary-glow) / 0.3);
+    --shadow-memory: 0 8px 32px -8px hsl(var(--memory-glow) / 0.4);
+
+    --sidebar-background: 220 22% 12%;
+    --sidebar-foreground: 220 8% 85%;
+    --sidebar-primary: 260 85% 68%;
+    --sidebar-primary-foreground: 220 25% 8%;
+    --sidebar-accent: 220 20% 18%;
+    --sidebar-accent-foreground: 220 8% 82%;
+    --sidebar-border: 220 20% 20%;
+    --sidebar-ring: 260 85% 68%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
