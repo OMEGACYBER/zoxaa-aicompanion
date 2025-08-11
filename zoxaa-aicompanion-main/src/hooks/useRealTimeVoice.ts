@@ -178,10 +178,10 @@ const useRealTimeVoice = (): RealTimeVoiceHookReturn => {
         recognitionRef.current.maxAlternatives = 1;
         recognitionRef.current.lang = 'en-US';
         
-        // Mobile-specific guidance
+        // Mobile-specific guidance with better error handling
         toast({
           title: "Mobile Voice Mode",
-          description: "Tap and hold the microphone button to speak. Text input is also available.",
+          description: "Tap and hold the microphone button to speak. Speak clearly and ensure good microphone access.",
           variant: "default"
         });
       } else {
@@ -216,8 +216,8 @@ const useRealTimeVoice = (): RealTimeVoiceHookReturn => {
           return;
         }
         
-        // Prevent too frequent restarts - increased to 5 seconds
-        if (timeSinceLastRestart < 5000) {
+        // Prevent too frequent restarts - increased to 3 seconds
+        if (timeSinceLastRestart < 3000) {
           console.log('⚠️ Restart too frequent, waiting...');
           shouldRestart = false;
         }
@@ -230,15 +230,21 @@ const useRealTimeVoice = (): RealTimeVoiceHookReturn => {
             break;
           case 'no-speech':
             console.log('No speech detected, attempting to restart...');
-            errorMessage = "No speech detected. Please try speaking louder.";
+            errorMessage = "No speech detected. Please try speaking louder or check your microphone.";
             shouldShowToast = false;
             // Only restart no-speech errors occasionally, not every time
-            if (restartCountRef.current < 2) {
+            if (restartCountRef.current < 1) {
               shouldRestart = true;
               restartCountRef.current++;
             } else {
               console.log('Too many no-speech errors, stopping restart attempts');
               shouldRestart = false;
+              // Show a helpful message to the user
+              toast({
+                title: "Voice Recognition",
+                description: "No speech detected. Please try speaking clearly or use text input.",
+                variant: "default"
+              });
             }
             break;
           case 'network':
@@ -278,7 +284,7 @@ const useRealTimeVoice = (): RealTimeVoiceHookReturn => {
         }
         
         // Handle restart logic with improved timeout
-        if (shouldRestart && isListening && !isRestartingRef.current && timeSinceLastRestart >= 5000) {
+        if (shouldRestart && isListening && !isRestartingRef.current && timeSinceLastRestart >= 3000) {
           console.log(`🔄 Attempting to restart speech recognition (attempt ${restartCountRef.current}/${maxRestartAttempts})...`);
           isRestartingRef.current = true;
           lastRestartTimeRef.current = now;
@@ -297,14 +303,14 @@ const useRealTimeVoice = (): RealTimeVoiceHookReturn => {
                       setIsListening(false);
                     }
                   }
-                }, 2000); // Increased delay for better stability
+                }, 1000); // Reduced delay for better responsiveness
               } catch (stopError) {
                 console.error('Failed to stop speech recognition for restart:', stopError);
                 setIsListening(false);
               }
             }
             isRestartingRef.current = false;
-          }, 3000); // Increased delay before restart
+          }, 2000); // Reduced delay before restart
         } else if (!shouldRestart) {
           setIsListening(false);
         }
@@ -337,7 +343,7 @@ const useRealTimeVoice = (): RealTimeVoiceHookReturn => {
         console.log('🎤 Speech recognition ended');
         if (isListening && !isRestartingRef.current) {
           // Only auto-restart if we haven't had too many errors
-          if (restartCountRef.current < 3) {
+          if (restartCountRef.current < 2) {
             console.log('🔄 Speech recognition ended, attempting to restart...');
             setTimeout(() => {
               if (recognitionRef.current && isListening) {
@@ -349,7 +355,7 @@ const useRealTimeVoice = (): RealTimeVoiceHookReturn => {
                   setIsListening(false);
                 }
               }
-            }, 1000); // Increased delay
+            }, 500); // Reduced delay for better responsiveness
           } else {
             console.log('Too many errors, not auto-restarting');
             setIsListening(false);
