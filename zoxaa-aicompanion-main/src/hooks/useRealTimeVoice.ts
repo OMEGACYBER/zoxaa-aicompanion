@@ -14,6 +14,7 @@ interface RealTimeVoiceHookReturn {
   clearTranscript: () => void;
   setVoiceSettings: (settings: VoiceSettings) => void;
   requestMicrophonePermission: () => Promise<boolean>;
+  resetSpeechRecognition: () => void;
 }
 
 interface VoiceSettings {
@@ -168,9 +169,16 @@ const useRealTimeVoice = (): RealTimeVoiceHookReturn => {
 
     try {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      
+      if (!SpeechRecognition) {
+        console.error('Speech recognition not supported');
+        setVoiceSupported(false);
+        return;
+      }
+      
       recognitionRef.current = new SpeechRecognition();
       
-      // Browser-specific settings
+      // Enhanced browser-specific settings with better error handling
       if (isMobile) {
         console.log('📱 Mobile device detected, applying mobile-specific settings');
         recognitionRef.current.continuous = false;
@@ -185,7 +193,7 @@ const useRealTimeVoice = (): RealTimeVoiceHookReturn => {
           variant: "default"
         });
       } else {
-        // Desktop settings
+        // Desktop settings with improved reliability
         recognitionRef.current.continuous = true;
         recognitionRef.current.interimResults = true;
         recognitionRef.current.lang = 'en-US';
@@ -232,19 +240,27 @@ const useRealTimeVoice = (): RealTimeVoiceHookReturn => {
             console.log('No speech detected, attempting to restart...');
             errorMessage = "No speech detected. Please try speaking louder or check your microphone.";
             shouldShowToast = false;
-            // Only restart no-speech errors occasionally, not every time
-            if (restartCountRef.current < 1) {
+            
+            // For no-speech errors, be more conservative with restarts
+            if (restartCountRef.current === 0) {
               shouldRestart = true;
               restartCountRef.current++;
+              console.log('First no-speech error, attempting restart...');
             } else {
-              console.log('Too many no-speech errors, stopping restart attempts');
+              console.log('Multiple no-speech errors detected, stopping restart attempts');
               shouldRestart = false;
-              // Show a helpful message to the user
+              // Show a helpful message to the user with specific guidance
               toast({
-                title: "Voice Recognition",
-                description: "No speech detected. Please try speaking clearly or use text input.",
-                variant: "default"
+                title: "Voice Recognition Issue",
+                description: "No speech detected. Please check your microphone, speak clearly, or use text input.",
+                variant: "default",
+                duration: 5000
               });
+              
+              // Reset the listening state to allow manual restart
+              setTimeout(() => {
+                setIsListening(false);
+              }, 1000);
             }
             break;
           case 'network':
@@ -374,58 +390,82 @@ const useRealTimeVoice = (): RealTimeVoiceHookReturn => {
     }
   }, [voiceSupported, isMobile, isListening, toast]);
 
-  const startRealTimeListening = useCallback(async () => {
-    try {
-      // Check if voice is supported
-      if (!voiceSupported) {
-        throw new Error('Voice recognition not supported');
-      }
-
-      // Check if already listening
-      if (isListening) {
-        console.log('Speech recognition already active');
-        return;
-      }
-
-      // Request microphone permission if not already granted
-      if (!permissionGranted) {
-        const permissionGranted = await requestMicrophonePermission();
-        if (!permissionGranted) {
-          throw new Error('Microphone permission denied');
+  const resetSpeechRecognition = useCallback(() => {
+    console.log('🔄 Resetting speech recognition state...');
+    restartCountRef.current = 0;
+    lastRestartTimeRef.current = 0;
+    isRestartingRef.current = false;
+    setIsListening(false);
+    
+    // Re-initialize after a short delay
+    setTimeout(() => {
+      if (voiceSupported && recognitionRef.current) {
+        try {
+          recognitionRef.current.start();
+          console.log('✅ Speech recognition reset and restarted');
+        } catch (error) {
+          console.error('Failed to restart after reset:', error);
         }
       }
+    }, 2000);
+  }, [voiceSupported]);
 
-      // Check if recognition is already started
-      if (recognitionRef.current?.state === 'recording' || recognitionRef.current?.state === 'starting') {
-        console.log('Speech recognition already started');
+  const startRealTimeListening = useCallback(async () => {
+    if (!voiceSupported) {
+      toast({
+        title: "Voice Not Supported",
+        description: "Voice recognition is not supported in this browser. Please use text input.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!permissionGranted) {
+      const granted = await requestMicrophonePermission();
+      if (!granted) {
+        toast({
+          title: "Microphone Permission Required",
+          description: "Please allow microphone access to use voice features.",
+          variant: "destructive"
+        });
         return;
       }
+    }
 
-      // Add a small delay to ensure proper initialization
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-      // Reset retry counter when starting fresh
+    if (!recognitionRef.current) {
+      console.error('Speech recognition not initialized');
+      toast({
+        title: "Voice Recognition Error",
+        description: "Voice recognition failed to initialize. Please refresh the page.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      // Reset error counters when starting fresh
       restartCountRef.current = 0;
       lastRestartTimeRef.current = 0;
       isRestartingRef.current = false;
       
-      recognitionRef.current?.start();
-      setIsListening(true);
+      recognitionRef.current.start();
+      setIsListening(true); // Changed from setIsVoiceActive to setIsListening
+      console.log('🎤 Started real-time voice listening');
       
       toast({
-        title: "Voice Mode Active",
-        description: "I'm listening to you in real-time..."
+        title: "Voice Recognition Active",
+        description: "Speak clearly into your microphone. I'm listening!",
+        variant: "default"
       });
     } catch (error) {
-      console.error('Failed to start speech recognition:', error);
+      console.error('Failed to start voice recognition:', error);
       toast({
-        title: "Voice Error",
-        description: "Unable to start voice recognition. Please use text input.",
+        title: "Voice Recognition Error",
+        description: "Failed to start voice recognition. Please try again or use text input.",
         variant: "destructive"
       });
-      throw error;
     }
-  }, [voiceSupported, isListening, permissionGranted, requestMicrophonePermission, toast]);
+  }, [voiceSupported, permissionGranted, requestMicrophonePermission, toast]);
 
   const stopRealTimeListening = useCallback(() => {
     if (recognitionRef.current) {
@@ -546,6 +586,7 @@ const useRealTimeVoice = (): RealTimeVoiceHookReturn => {
     clearTranscript,
     setVoiceSettings,
     requestMicrophonePermission,
+    resetSpeechRecognition,
   };
 };
 
